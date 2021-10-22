@@ -1,0 +1,13 @@
+name: InvEffects
+version: '${project.version}'
+main: io.github.aspwil.inveffects.InvEffects
+api-version: 1.16
+authors: [ aspwil ]
+website: https://github.com/aspwil/invEffects
+commands:
+  inveffects:
+    description: This is a test command.
+    usage: you should never get this message, if you do please report it - invEffects
+    aliases: [inveff,inve]
+    permission: InvEffects.test
+    permission-message: You don't have permission InvEffects.test

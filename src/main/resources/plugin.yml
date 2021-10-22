@@ -9,5 +9,5 @@ commands:
     description: This is a test command.
     usage: you should never get this message, if you do please report it - invEffects
     aliases: [inveff,inve]
-    permission: InvEffects.test
-    permission-message: You don't have permission InvEffects.test
+    permission: InvEffects.use
+    permission-message: You don't have permission InvEffects.use

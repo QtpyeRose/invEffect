@@ -7,11 +7,11 @@ the invEffect plugin aims to add the ability to make items give a player potion 
 
 it has 3 commands:
 
-/inve set <effect> <power> - applies the effect to the item in your hand
+/inve set [effect] [power] - applies the effect to the item in your hand
 
 /inve list - lists the effects on the item in your hand
 
-/inve remove <effect> - removes the effect from the item
+/inve remove [effect] - removes the effect from the item
 
 
 it has a single permission to allow all these commands 

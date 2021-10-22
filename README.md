@@ -3,6 +3,7 @@ this is the github for a plugin develped for minecraft spigot 1.16.5
 
 the invEffect plugin aims to add the ability to make items give a player potion effects from anywhere within there inventory
 
+
 it has 3 commands:
 
 /inve set effect power - applies the effect to the item in your hand\
@@ -11,8 +12,10 @@ it has 3 commands:
 
 /inve remove effect - removes the effect from the item
 
+
 it has a single permission to allow all these commands 
 InvEffects.use
+
 
 it works by writing metadata to the items,
 

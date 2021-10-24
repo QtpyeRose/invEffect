@@ -55,3 +55,7 @@ armor: "inveffects:armoreffects"
 </pre>
 
 
+ALL OF THE CODE IN THIS PROJECT IS DEDICATED TO THE PUBLIC DOMAIN, and as such is free for anyone to use, distribute, and modify for any reason, commercial or noncomercal, with or without attribution to the creator(s), although attribution is smiled upon.
+
+basicly what im trying to say is use this code for whatever you want. if i stop updating it feel free to do so yourself and re-release it, or use any part of it for what ever project you want. i made it from scratch in like 12 hours of total work, so its not much, but i hope it helps
+

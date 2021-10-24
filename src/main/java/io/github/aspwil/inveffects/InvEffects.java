@@ -8,6 +8,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
@@ -20,16 +21,28 @@ import java.util.Arrays;
 import java.util.logging.Level;
 
 public final class InvEffects extends JavaPlugin {
-    private int loopTime = 5;
-    private NamespacedKey key;
+    //set up all the variables we will be using
+    private int refreshRate;
+    private int priorityRefreshRate;
+    private final NamespacedKey invKey = new NamespacedKey(this, "InvEffects");
+    private final NamespacedKey hotBarKey = new NamespacedKey(this, "HotBarEffects");
+    private final NamespacedKey handKey = new NamespacedKey(this, "HandEffects");
+    private final NamespacedKey offHandKey = new NamespacedKey(this, "OffHandEffects");
+    private final NamespacedKey armorKey = new NamespacedKey(this, "armorEffects");
+    private final NamespacedKey[] keys = {invKey, hotBarKey, handKey, offHandKey, armorKey};
 
     @Override
     public void onEnable() {
-        key = new NamespacedKey(this, "InvEffects");
+        //set up the auto complete
+        getCommand("InvEffects").setTabCompleter(new InvEffectsTabCompleter());
+        //read the config and set values
         getConfig().options().copyDefaults();
         saveDefaultConfig();
-        loopTime = getConfig().getInt("looptime");
-        Bukkit.getScheduler().scheduleSyncRepeatingTask(this, this::scanInv, 1L, 20L * loopTime);
+        refreshRate = getConfig().getInt("RefreshRate");
+        priorityRefreshRate = getConfig().getInt("PriorityRefreshRate");
+        //set up the schedulers to repeatedly call the functions to apply effects
+        Bukkit.getScheduler().scheduleSyncRepeatingTask(this, this::scanAndApplyEffects, 1L, refreshRate);
+        Bukkit.getScheduler().scheduleSyncRepeatingTask(this, this::ScanAndApplyHighPriorityEffects, 1L, priorityRefreshRate);
     }
 
     @Override
@@ -45,20 +58,17 @@ public final class InvEffects extends JavaPlugin {
             Player player = (Player) sender;
             String help =
                     ChatColor.RED + "~ ~ ~ [InvEffects] ~ ~ ~\n" +
-                            ChatColor.GOLD +
-                            "/invEffects add <effect_name> <power> - adds an effect onto the item in your hand\n" +
-                            "/invEffects list - lists the effects on the item in your hand\n" +
-                            "/invEffects remove <inv/hotbar/hand/offhand> effect - removes the effect from the item\n" + "" +
-                            "/invEffects clear - removes all effects on the item";
+                            ChatColor.GOLD + "/inve add <inv/hotbar/hand/offhand/Armor> <effect_name> <power> " + ChatColor.RED + "- adds an effect onto the item in your hand\n" +
+                            ChatColor.GOLD + "/inve list " + ChatColor.RED + "- lists the effects on the item in your hand\n" +
+                            ChatColor.GOLD + "/inve remove <inv/hotbar/hand/offhand/armor> effect " + ChatColor.RED + "- removes the effect from the item\n" +
+                            ChatColor.GOLD + "/inve clear " + ChatColor.RED + "- removes all effects on the item" +
+                            ChatColor.GOLD + "/inve types " + ChatColor.RED + "- lists all the types and what they do" +
+                            ChatColor.GOLD + "/inve effects " + ChatColor.RED + "- lists the name of all the potion effects";
 
             if (args.length == 0) {
                 player.sendMessage(help);
                 return true;
             }
-            ArrayList<String> entries = new ArrayList<>();
-            String rawString;
-            ItemMeta itemMeta;
-            StringBuilder sb;
             switch (args[0]) {
                 case "set":
                     //check to make sure the player is holding something
@@ -67,29 +77,49 @@ public final class InvEffects extends JavaPlugin {
                         break;
                     }
                     //check for the correct amount of args
-                    if (args.length == 3) {
-                        //check if the potion effect supplied actauly exists
-                        if (PotionEffectType.getByName(args[1]) == null) {
-                            sendMessage(player, "unknown effect name: " + args[1]);
+                    if (args.length == 4) {
+                        // - - - - check if its a valid type
+                        //valid types
+                        String[] types = {"inv", "hotbar", "hand", "offhand", "armor"};
+                        //assume its not a valid type
+                        boolean correctType = false;
+                        //for each type
+                        for (String type : types) {
+                            //check if its a legit type
+                            if (args[1].equalsIgnoreCase(type)) {
+                                //if it is, this is a correct type
+                                correctType = true;
+                                break;
+                            }
+                        }
+                        //if its not a correct type
+                        if (!correctType) {
+                            //tell the player its not a correct type
+                            sendMessage(player, "Invalid type, use <inv/hotbar/hand/offhand/Armor>");
+                            break;
+                        }
+                        //check if the potion effect supplied actually exists
+                        if (PotionEffectType.getByName(args[2]) == null) {
+                            sendMessage(player, "unknown effect name: " + args[2]);
                             break;
                         }
 
                         //attempt to parse the power as an int
                         try {
                             //parse the int
-                            int power = Integer.parseInt(args[2]);
+                            int power = Integer.parseInt(args[3]);
                             //set the value of the effect in the meta of the item in there hand
-                            setItemEffectEntry(player.getInventory().getItem(EquipmentSlot.HAND), args[1], power);
+                            setItemEffectEntry(player.getInventory().getItem(EquipmentSlot.HAND), args[1], args[2], power);
                             //tell the player it was set
-                            sendMessage(player, "set " + args[1] + " effect to " + power);
+                            sendMessage(player, "set " + args[2] + " effect to " + power + " for "+args[1]);
                         } catch (NumberFormatException e) {
                             //tell the player they messed up the int
-                            sendMessage(player, "invalid power: " + args[2]);
+                            sendMessage(player, "invalid power: " + args[3]);
                             break;
                         }
                     } else {
                         //invalid number of args, tell the player the correct syntax
-                        sendMessage(player, "/inve add <effect_name> <power> - adds an effect onto the item in your hand");
+                        sendMessage(player, "/inve add <inv/hotbar/hand/offhand/Armor> <effect_name> <power> - adds an effect onto the item in your hand");
                     }
                     break;
                 case "list":
@@ -98,61 +128,84 @@ public final class InvEffects extends JavaPlugin {
                         sendMessage(player, "you're not holding anything silly");
                         break;
                     }
-                    //get the item meta data
-                    itemMeta = player.getInventory().getItem(EquipmentSlot.HAND).getItemMeta();
-
-                    //check if the item has a metadata tag from this plugin
-                    if (!itemMeta.getPersistentDataContainer().has(key, PersistentDataType.STRING)) {
-                        sendMessage(player, "no invEffect data on this item");
-                        break;
+                    //attept to list all effects data
+                    try {
+                        sendMessage(player, "effects: \n" + getItemEffectsData(player.getInventory().getItem(EquipmentSlot.HAND)));
+                    } catch (NoEffectsDataException e) {
+                        sendMessage(player, "no InvEffects data on item");
                     }
-
-                    //get the metadata as a raw string
-                    rawString = itemMeta.getPersistentDataContainer().get(key, PersistentDataType.STRING);
-                    //change the string into an arraylist by spliting based on ","
-                    entries = new ArrayList<>(Arrays.asList(rawString.split(",")));
-                    //tell the player the info on the item
-                    sendMessage(player, "effects: " + entries);
                     break;
 
                 case "remove":
                     //check the play is actualy holding something
                     if (player.getInventory().getItem(EquipmentSlot.HAND).getType().isAir()) {
-                        sendMessage(player, "your not holding anything silly");
+                        sendMessage(player, "you're not holding anything silly");
                         break;
                     }
-                    if (args.length == 2) {
+                    if (args.length == 3) {
+                        //check if the type is a correct one
+                        if (!(args[1].equalsIgnoreCase("inv") || args[1].equalsIgnoreCase("hotbar") || args[1].equalsIgnoreCase("hand") || args[1].equalsIgnoreCase("offhand"))) {
+                            sendMessage(player, "invalid type, use <inv/hotbar/hand/offhand/Armor>");
+                            break;
+                        }
                         //check if the player supplied a legit potion effect name
-                        if (PotionEffectType.getByName(args[1]) == null) {
-                            sendMessage(player, "unknown effect name: " + args[1]);
+                        if (PotionEffectType.getByName(args[2]) == null) {
+                            sendMessage(player, "unknown effect name: " + args[2]);
                             break;
                         }
                         try {
                             //remove the item in hands effect entry
-                            removeItemEffectEntry(player.getInventory().getItem(EquipmentSlot.HAND), args[1]);
+                            removeItemEffectEntry(player.getInventory().getItem(EquipmentSlot.HAND), args[1], args[2]);
+                            sendMessage(player, "removed effect "+args[2]+" for "+args[1]);
                         } catch (NoEffectsDataException e) {
                             sendMessage(player, "there is no InvEffects data on this item");
                         } catch (NoEffectEntryException e) {
-                            sendMessage(player, "there is no entry for the effect: \"" + args[1] + "\" listed on this item");
+                            sendMessage(player, "there is no entry for the effect: \"" + args[2] + "\" listed on this item");
                         }
                     } else {
                         //invalid number of args, tell the player the correct syntax
-                        sendMessage(player, "/inve remove effect - removes the effect from the item");
+                        sendMessage(player, "/inve remove <inv/hotbar/hand/offhand/Armor> effect - removes the effect from the item");
                     }
                     break;
                 case "clear":
                     //check the play is actually holding something
                     if (player.getInventory().getItem(EquipmentSlot.HAND).getType().isAir()) {
-                        sendMessage(player, "your not holding anything silly");
+                        sendMessage(player, "you're not holding anything silly");
                         break;
                     }
                     //check if the item actually has metadata from the plugin
                     try {
                         removeAllItemEffectEntries(player.getInventory().getItem(EquipmentSlot.HAND));
-                        sendMessage(player, "EffectsData cleared for item");
+                        sendMessage(player, "InvEffects data cleared for item");
                     } catch (NoEffectsDataException e) {
-                        sendMessage(player, "this item has no effect data");
+                        sendMessage(player, "this item has no InvEffects data");
                     }
+                    break;
+                case "types":
+                    sendMessage(player, "Types:\n" +
+                            "inv: inventory\n" +
+                            "hotbar: the hotbar (the bottom 9 slots)\n" +
+                            "hand: in the players hand\n" +
+                            "offhand: the offhand slot (the other hand)\n" +
+                            "armor: in one of the players armor slots");
+                    break;
+                case "effects":
+                    //make a string builder
+                    StringBuilder effectList = new StringBuilder(ChatColor.RED+"[");
+                    //for each effect type listed in minecraft
+                    for (PotionEffectType effect : PotionEffectType.values()) {
+                        //add the name of the effect to the string builder and a comma
+                        effectList.append(ChatColor.GOLD);
+                        effectList.append(effect.getName());
+                        effectList.append(ChatColor.RED);
+                        effectList.append(", ");
+                    }
+                    //remove the last comma and space
+                    effectList.setLength(effectList.length() - 2);
+                    //adda closing ]
+                    effectList.append("]");
+                    //display the effects list to the player
+                    sendMessage(player, "Effects: " + effectList.toString());
                     break;
                 default:
                     player.sendMessage(help);
@@ -165,41 +218,63 @@ public final class InvEffects extends JavaPlugin {
         return false;
     }
 
-    private void scanInv() {
+    private void scanAndApplyEffects() {
         for (Player player : Bukkit.getOnlinePlayers()) {
-            for (ItemStack itemStack : player.getInventory().getContents()) {
-                if (itemStack == null) {
-                    continue;
-                }
-                PersistentDataContainer container = itemStack.getItemMeta().getPersistentDataContainer();
-                if (!container.has(key, PersistentDataType.STRING)) {
-                    continue;
-                }
-                String[] values = container.get(key, PersistentDataType.STRING).split(",");
-                if (values.length == 1) {
-                    continue;
-                }
-                for (int i = 0; i < values.length; i += 2) {
-                    if (PotionEffectType.getByName(values[i]) == null) {
-                        getLogger().log(Level.WARNING, "uh oh theres am unknown effect name - invEffects");
-                        continue;
-                    }
-                    try {
-                        int power = Integer.parseInt(values[i + 1]);
-                        player.addPotionEffect(PotionEffectType.getByName(values[i]).createEffect(loopTime * 20 + 20, power));
-                    } catch (NumberFormatException e) {
-                        getLogger().log(Level.WARNING, "uh oh theres a weird metadata power value: " + values[i + 1] + " - invEffects");
-                    }
-
-                }
-
-
+            PlayerInventory inventoryObject = player.getInventory();
+            applyEffectsForItems(player, refreshRate + 1, invKey, inventoryObject.getContents());
+            applyEffectsForItems(player, refreshRate + 1, armorKey, inventoryObject.getArmorContents());
+            ItemStack[] hotBar = new ItemStack[9];
+            for (int i = 0; i <= 8; i++) {
+                hotBar[i] = inventoryObject.getItem(i);
             }
+            applyEffectsForItems(player, refreshRate + 1, hotBarKey, hotBar);
+
         }
     }
 
-    private void setItemEffectEntry(ItemStack item, String effectName, int power) {
+    //this is for high importance items that may get changed al lot quickly, like in item in hand and offhand
+    //this is important for things like keeping combat smooth if you suddenly witch to a sword
+    private void ScanAndApplyHighPriorityEffects() {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            PlayerInventory inventoryObject = player.getInventory();
+            applyEffectsForItems(player, priorityRefreshRate + 1, handKey, inventoryObject.getItemInMainHand());
+            applyEffectsForItems(player, priorityRefreshRate + 1, offHandKey, inventoryObject.getItemInOffHand());
+        }
+    }
 
+    private void applyEffectsForItems(Player player, int length, NamespacedKey typeKey, ItemStack... items) {
+        for (ItemStack itemStack : items) {
+            if (itemStack == null || itemStack.getType().isAir()) {
+                continue;
+            }
+            PersistentDataContainer container = itemStack.getItemMeta().getPersistentDataContainer();
+            if (!container.has(typeKey, PersistentDataType.STRING)) {
+                continue;
+            }
+            String[] values = container.get(typeKey, PersistentDataType.STRING).split(",");
+            if (values.length == 1) {
+                continue;
+            }
+            for (int i = 0; i < values.length; i += 2) {
+                if (PotionEffectType.getByName(values[i]) == null) {
+                    player.sendMessage("theres an invalid InvEffects tag on this item, unknown effect name: \"" + values[i] + "\"\n please contact an admin and let them know a generated item was configured wrong");
+                    continue;
+                }
+                try {
+                    int power = Integer.parseInt(values[i + 1]);
+                    player.addPotionEffect(PotionEffectType.getByName(values[i]).createEffect(length, power));
+                } catch (NumberFormatException e) {
+                    player.sendMessage("theres an invalid InvEffects tag on this item, invalid effect power: \"" + values[i + 1] + "\"\n please contact an admin and let them know a generated item was configured wrong");
+                }
+
+            }
+
+        }
+    }
+
+    private void setItemEffectEntry(ItemStack item, String type, String effectName, int power) {
+
+        NamespacedKey key = new NamespacedKey(this, type + "effects");
         //initialise the array for the entries encoded in the metadata string
         ArrayList<String> entries = new ArrayList<>();
         //get the metadata object from the item in the players inventory
@@ -215,7 +290,7 @@ public final class InvEffects extends JavaPlugin {
 
         //if the effectslist on the item is NOT empty
         if (!rawString.equals("")) {
-            //assemble the entries arraylist by spliting the rawstring based on ","
+            //assemble the entries' arraylist by splitting the rawstring based on ","
             entries = new ArrayList<>(Arrays.asList(rawString.split(",")));
             //remove any already existing entries for this effect
             removeEffectFromArrayList(entries, effectName);
@@ -233,9 +308,55 @@ public final class InvEffects extends JavaPlugin {
         item.setItemMeta(itemMeta);
     }
 
-    private void removeItemEffectEntry(ItemStack item, String effectName) throws NoEffectsDataException, NoEffectEntryException {
+    private String getItemEffectsData(ItemStack item) throws NoEffectsDataException {
+        //get the item metadata
+        ItemMeta itemMeta = item.getItemMeta();
 
-        //get the metadata object of the item in the players dand
+        // check if NONE of the keys have any data
+        //assume none of the keys have data
+        boolean hasData = false;
+        //go through each key
+        for (NamespacedKey key : keys) {
+            getLogger().log(Level.WARNING, key.toString());
+            //check if the key has data
+            if (itemMeta.getPersistentDataContainer().has(key, PersistentDataType.STRING)) {
+                //yes, there is data on this item
+                hasData = true;
+                //stop the loop
+                break;
+            }
+        }
+        //if we have not found any data throw noEffectsDataException
+        if (!hasData) {
+            throw new NoEffectsDataException();
+        }
+
+        //string builder for the list of effects
+        StringBuilder fullList = new StringBuilder();
+        //the String to hold the raw data
+        String rawString;
+        //the arrayList that will hold all the entries
+        ArrayList<String> entries;
+        for (NamespacedKey key : keys) {
+            if (!itemMeta.getPersistentDataContainer().has(key, PersistentDataType.STRING)) {
+                continue;
+            }
+            //get the metadata as a raw string
+            rawString = itemMeta.getPersistentDataContainer().get(key, PersistentDataType.STRING);
+            //change the string into an arraylist by spliting based on ","
+            entries = new ArrayList<>(Arrays.asList(rawString.split(",")));
+            //add the info to the list
+            fullList.append(key.getKey() + ":" + entries + "\n");
+        }
+        //remove the last newline
+        fullList.setLength(fullList.length() - 1);
+        return fullList.toString();
+    }
+
+    private void removeItemEffectEntry(ItemStack item, String type, String effectName) throws NoEffectsDataException, NoEffectEntryException {
+
+        NamespacedKey key = new NamespacedKey(this, type + "effects");
+        //get the metadata object of the item in the players and
         ItemMeta itemMeta = item.getItemMeta();
 
         //if the item does not have a metadata entry throw NoEffectsDataException
@@ -263,14 +384,14 @@ public final class InvEffects extends JavaPlugin {
     private void removeAllItemEffectEntries(ItemStack item) throws NoEffectsDataException {
         //get the metadata object of the item in the players and
         ItemMeta itemMeta = item.getItemMeta();
-
-        //if the item does not have any metadata entries
-        if (!itemMeta.getPersistentDataContainer().has(key, PersistentDataType.STRING)) {
-            throw new NoEffectsDataException();
+        for (NamespacedKey key : keys) {
+            //if the item does not have any metadata entries
+            if (!itemMeta.getPersistentDataContainer().has(key, PersistentDataType.STRING)) {
+                continue;
+            }
+            //set the metadata tag to nothing (viola
+            itemMeta.getPersistentDataContainer().set(key, PersistentDataType.STRING, "");
         }
-
-        //set the metadata tag to nothing (viola
-        itemMeta.getPersistentDataContainer().set(key, PersistentDataType.STRING, "");
         //set the items meta data
         item.setItemMeta(itemMeta);
     }
@@ -311,7 +432,7 @@ public final class InvEffects extends JavaPlugin {
 
 
     private void sendMessage(Player player, String toSay) {
-        player.sendMessage(ChatColor.GOLD + "[InvEffects] " + toSay);
+        player.sendMessage(ChatColor.GOLD + "[InvEffects] " + ChatColor.RED + toSay);
 
     }
 }

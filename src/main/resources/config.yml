@@ -1,7 +1,13 @@
-#the number of second inbetween checking to apply effects
+#the number of ticks between refreshing effects
+# (20 ticks = 1 second)
 #larger number means less server load
 #but items take longer to activate after being picked up
-#and take longer to wear off after being dropd
-looptime: 5
+#and take longer to wear off after being dropped
+RefreshRate: 100
+#this is the refresh rate for items held in the hand/offhand
+#they often need to refreshed faster because they change often and quickly
+#durring things like combat
+PriorityRefreshRate: 5
+
 
 

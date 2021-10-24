@@ -1,5 +1,5 @@
 name: InvEffects
-version: 1.0
+version: 1.1
 main: io.github.aspwil.inveffects.InvEffects
 api-version: 1.16
 authors: [ aspwil ]

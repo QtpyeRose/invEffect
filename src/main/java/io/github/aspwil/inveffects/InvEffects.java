@@ -5,6 +5,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
@@ -43,6 +44,7 @@ public final class InvEffects extends JavaPlugin {
         //set up the schedulers to repeatedly call the functions to apply effects
         Bukkit.getScheduler().scheduleSyncRepeatingTask(this, this::scanAndApplyEffects, 1L, refreshRate);
         Bukkit.getScheduler().scheduleSyncRepeatingTask(this, this::ScanAndApplyHighPriorityEffects, 1L, priorityRefreshRate);
+
     }
 
     @Override

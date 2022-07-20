@@ -2,6 +2,10 @@
 <pre>
 this is the github for a plugin developed for minecraft spigot 1.16.5
 
+this was developed for spigot 1.16.5
+you welcome to attempt to use it on any other version you want. (no gaurentee it will work though)
+if you encounter any issues please open a issue in the issues section
+
 the invEffect plugin aims to add the ability to make items give
 a player potion effects from anywhere within there inventory
 
